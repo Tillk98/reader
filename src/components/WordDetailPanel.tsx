@@ -24,7 +24,16 @@ export const WordDetailPanel: React.FC<WordDetailPanelProps> = ({
     return null;
   }
 
-  const activeTab = 'Meanings';
+  const viewToTab: Record<string, string> = {
+    context: 'Context',
+    meanings: 'Meanings',
+    explanation: 'Explanation',
+    dictionaries: 'Dictionaries',
+    ai: 'Meanings',
+    sentence: 'Context',
+    details: 'Meanings',
+  };
+  const activeTab = viewToTab[view] || 'Meanings';
 
   return (
     <aside className={`word-detail-panel ${isOpen ? 'open' : ''}`} aria-hidden={!isOpen}>
