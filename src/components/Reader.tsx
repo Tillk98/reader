@@ -274,7 +274,6 @@ export const Reader: React.FC = () => {
   const updatePhraseSelection = useCallback(
     (anchor: { sentenceIndex: number; wordIndex: number }, currentIndex: number) => {
       const sentenceWords = lesson.sentences[anchor.sentenceIndex].words;
-      const sentenceLength = sentenceWords.length;
       const maxSpan = 9;
       let start = Math.min(anchor.wordIndex, currentIndex);
       let end = Math.max(anchor.wordIndex, currentIndex);
