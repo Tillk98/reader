@@ -6,6 +6,7 @@ import {
   ChevronUp,
   CircleCheck,
   EyeOff,
+  Info,
   MessageSquare,
   NotebookPen,
   Pencil,
@@ -28,6 +29,8 @@ interface WordToolbarProps {
   wordText: string;
   wordTranslation?: string;
   wordElement: HTMLElement | null;
+  anchorRect?: DOMRect;
+  invalidSelectionText?: string;
   wordLevel: number;
   onSetWordLevel: (wordId: string, level: number) => void;
   onClose: () => void;
@@ -42,6 +45,8 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
   wordText,
   wordTranslation,
   wordElement,
+  anchorRect,
+  invalidSelectionText,
   wordLevel,
   onSetWordLevel,
   onClose,
@@ -74,6 +79,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
   const [selectedMeaning, setSelectedMeaning] = useState(translation);
   const [dictionaryMenuOpen, setDictionaryMenuOpen] = useState(false);
   const [dictionaryPopupOpen, setDictionaryPopupOpen] = useState(false);
+  const [translatePopupOpen, setTranslatePopupOpen] = useState(false);
   const [explainOpen, setExplainOpen] = useState(false);
   const [explainLoading, setExplainLoading] = useState(false);
   const [explainChunkCount, setExplainChunkCount] = useState(0);
@@ -189,7 +195,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
       const element = wordElement || document.getElementById(wordId);
       if (!element || !toolbarRef.current) return;
 
-      const rect = element.getBoundingClientRect();
+      const rect = anchorRect ?? element.getBoundingClientRect();
       const toolbarHeight = toolbarRef.current.offsetHeight || 0;
       const toolbarWidth = toolbarRef.current.offsetWidth || 0;
       
@@ -225,7 +231,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
     }
 
     return undefined;
-  }, [wordElement, wordId, isUserPositioned]);
+  }, [wordElement, wordId, isUserPositioned, anchorRect]);
 
   useEffect(() => {
     setIsUserPositioned(false);
@@ -242,6 +248,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
         setMeaningsOpen(false);
         setDictionaryMenuOpen(false);
         setDictionaryPopupOpen(false);
+        setTranslatePopupOpen(false);
         setExplainOpen(false);
         setInspectOpen(false);
         setNotesOpen(false);
@@ -269,6 +276,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
     setMeaningsOpen(false);
     setDictionaryMenuOpen(false);
     setDictionaryPopupOpen(false);
+    setTranslatePopupOpen(false);
     setExplainOpen(false);
     setInspectOpen(false);
     setNotesOpen(false);
@@ -285,6 +293,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
     setMeaningsOpen(false);
     setDictionaryMenuOpen(false);
     setDictionaryPopupOpen(false);
+    setTranslatePopupOpen(false);
     setExplainOpen(false);
     setNotesOpen(false);
     setInspectOpen(prev => !prev);
@@ -295,6 +304,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
     setMenuOpen(false);
     setDictionaryMenuOpen(false);
     setDictionaryPopupOpen(false);
+    setTranslatePopupOpen(false);
     setExplainOpen(false);
     setInspectOpen(false);
     setNotesOpen(false);
@@ -333,6 +343,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
     setMeaningsOpen(false);
     setDictionaryMenuOpen(false);
     setDictionaryPopupOpen(false);
+    setTranslatePopupOpen(false);
     setInspectOpen(false);
     setNotesOpen(false);
     setExplainOpen(prev => !prev);
@@ -382,6 +393,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
     setMeaningsOpen(false);
     setDictionaryMenuOpen(false);
     setDictionaryPopupOpen(false);
+    setTranslatePopupOpen(false);
     setExplainOpen(false);
     setInspectOpen(false);
     setNotesOpen(prev => !prev);
@@ -588,6 +600,58 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
           <span />
           <span />
         </button>
+        {invalidSelectionText ? (
+          <div className="word-toolbar-invalid">
+            <span className="word-toolbar-invalid-text">{invalidSelectionText}</span>
+            <button
+              className="word-toolbar-invalid-info word-toolbar-tooltip"
+              type="button"
+              data-tooltip="To create a LingQ, please highlight up to 9 words from the same sentence."
+            >
+              <Info size={18} />
+            </button>
+            <div className="word-toolbar-divider" />
+            <button
+              className="word-toolbar-invalid-translate"
+              type="button"
+              onClick={() => setTranslatePopupOpen(true)}
+            >
+              Google Translate
+            </button>
+            {translatePopupOpen && (
+              <div className="word-toolbar-modal-overlay" onClick={() => setTranslatePopupOpen(false)}>
+                <div
+                  className="word-toolbar-meaning-dictionary-popup"
+                  role="dialog"
+                  aria-modal="true"
+                  onClick={event => event.stopPropagation()}
+                >
+                  <button
+                    className="word-toolbar-meaning-dictionary-popup-close"
+                    type="button"
+                    aria-label="Close translate popup"
+                    onClick={() => setTranslatePopupOpen(false)}
+                  >
+                    <X size={14} />
+                  </button>
+                  <div className="word-toolbar-meaning-dictionary-popup-title">Google Translate</div>
+                  <div className="word-toolbar-meaning-dictionary-popup-body">
+                    Translation preview placeholder
+                  </div>
+                  <div className="word-toolbar-meaning-dictionary-popup-preview">
+                    <div className="word-toolbar-meaning-dictionary-popup-preview-header">
+                      {invalidSelectionText}
+                    </div>
+                    <div className="word-toolbar-meaning-dictionary-popup-preview-body">
+                      Embedded Google Translate preview placeholder
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
         {/* Translation */}
         <div className="word-toolbar-translation">
           <button className="word-toolbar-definition" type="button" onClick={handleOpenDefinition}>
@@ -1132,6 +1196,8 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
           )}
         </div>
 
+          </>
+        )}
       </div>
     </div>
   );

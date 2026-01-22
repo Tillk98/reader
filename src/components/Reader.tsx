@@ -18,6 +18,19 @@ export const Reader: React.FC = () => {
   const [ignoredWords, setIgnoredWords] = useState<Set<string>>(new Set());
   const [wordLevels, setWordLevels] = useState<Map<string, number>>(new Map());
   const [selectedWordId, setSelectedWordId] = useState<string | null>(null);
+  const [lingqWords, setLingqWords] = useState<Set<string>>(new Set());
+  const [phraseSelection, setPhraseSelection] = useState<{
+    sentenceIndex: number;
+    startIdx: number;
+    endIdx: number;
+  } | null>(null);
+  const [invalidSelection, setInvalidSelection] = useState<{
+    wordIds: string[];
+    text: string;
+  } | null>(null);
+  const [isSelectingPhrase, setIsSelectingPhrase] = useState(false);
+  const [didDragSelection, setDidDragSelection] = useState(false);
+  const selectionAnchorRef = useRef<{ sentenceIndex: number; wordIndex: number; wordId: string } | null>(null);
   const [chevronVisible, setChevronVisible] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const mouseActivityTimeoutRef = useRef<number | null>(null);
@@ -31,6 +44,28 @@ export const Reader: React.FC = () => {
       });
     });
     return words;
+  }, []);
+
+  const wordOrder = React.useMemo(() => allWords.map(word => word.id), [allWords]);
+  const wordIndexMap = React.useMemo(() => {
+    const map = new Map<string, number>();
+    wordOrder.forEach((id, index) => map.set(id, index));
+    return map;
+  }, [wordOrder]);
+  const wordTextMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    allWords.forEach(word => map.set(word.id, word.text));
+    return map;
+  }, [allWords]);
+
+  const wordMeta = React.useMemo(() => {
+    const map = new Map<string, { sentenceIndex: number; wordIndex: number }>();
+    lesson.sentences.forEach((sentence, sentenceIndex) => {
+      sentence.words.forEach((word, wordIndex) => {
+        map.set(word.id, { sentenceIndex, wordIndex });
+      });
+    });
+    return map;
   }, []);
 
   // Calculate pages based on container dimensions
@@ -201,6 +236,10 @@ export const Reader: React.FC = () => {
   }, [handleMouseMove]);
 
   const handleWordClick = useCallback((wordId: string) => {
+    if (didDragSelection) {
+      setDidDragSelection(false);
+      return;
+    }
     // If word is known or ignored, don't show toolbar
     if (knownWords.has(wordId) || ignoredWords.has(wordId)) {
       return;
@@ -209,8 +248,18 @@ export const Reader: React.FC = () => {
     // Toggle selection - if already selected, close toolbar; otherwise open it
     if (selectedWordId === wordId) {
       setSelectedWordId(null);
+      setPhraseSelection(null);
+      setInvalidSelection(null);
+      setClickedWords(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(wordId);
+        return newSet;
+      });
     } else {
       setSelectedWordId(wordId);
+      setPhraseSelection(null);
+      setInvalidSelection(null);
+      setLingqWords(prev => new Set(prev).add(wordId));
       // Also mark as clicked for highlighting
       setClickedWords(prev => {
         const newSet = new Set(prev);
@@ -220,10 +269,126 @@ export const Reader: React.FC = () => {
         return newSet;
       });
     }
-  }, [selectedWordId, knownWords, ignoredWords]);
+  }, [selectedWordId, knownWords, ignoredWords, didDragSelection]);
+
+  const updatePhraseSelection = useCallback(
+    (anchor: { sentenceIndex: number; wordIndex: number }, currentIndex: number) => {
+      const sentenceWords = lesson.sentences[anchor.sentenceIndex].words;
+      const sentenceLength = sentenceWords.length;
+      const maxSpan = 9;
+      let start = Math.min(anchor.wordIndex, currentIndex);
+      let end = Math.max(anchor.wordIndex, currentIndex);
+      const span = end - start + 1;
+      if (span > maxSpan) {
+        const selectedIds = sentenceWords.slice(start, end + 1).map(word => word.id);
+        setClickedWords(new Set(selectedIds));
+        setPhraseSelection(null);
+        setInvalidSelection({
+          wordIds: selectedIds,
+          text: sentenceWords
+            .slice(start, end + 1)
+            .map(word => word.text)
+            .join(' '),
+        });
+        setDidDragSelection(true);
+        return;
+      }
+
+      setInvalidSelection(null);
+      setPhraseSelection({ sentenceIndex: anchor.sentenceIndex, startIdx: start, endIdx: end });
+      const selectedIds = sentenceWords.slice(start, end + 1).map(word => word.id);
+      setClickedWords(new Set(selectedIds));
+      if (selectedIds.length > 1) {
+        setDidDragSelection(true);
+      }
+    },
+    [lesson.sentences]
+  );
+
+  const handleWordPointerDown = useCallback(
+    (wordId: string) => {
+      if (knownWords.has(wordId) || ignoredWords.has(wordId)) {
+        return;
+      }
+      const meta = wordMeta.get(wordId);
+      if (!meta) return;
+      selectionAnchorRef.current = { sentenceIndex: meta.sentenceIndex, wordIndex: meta.wordIndex, wordId };
+      setIsSelectingPhrase(true);
+      setDidDragSelection(false);
+      setInvalidSelection(null);
+      updatePhraseSelection(meta, meta.wordIndex);
+    },
+    [knownWords, ignoredWords, wordMeta, updatePhraseSelection]
+  );
+
+  const handleWordPointerEnter = useCallback(
+    (wordId: string) => {
+      if (!isSelectingPhrase || !selectionAnchorRef.current) return;
+      const anchor = selectionAnchorRef.current;
+      const meta = wordMeta.get(wordId);
+      if (!meta) return;
+      if (meta.sentenceIndex !== anchor.sentenceIndex) {
+        const anchorIndex = wordIndexMap.get(anchor.wordId);
+        const currentIndex = wordIndexMap.get(wordId);
+        if (anchorIndex === undefined || currentIndex === undefined) return;
+        const start = Math.min(anchorIndex, currentIndex);
+        const end = Math.max(anchorIndex, currentIndex);
+        const selectedIds = wordOrder.slice(start, end + 1);
+        const text = selectedIds
+          .map(id => wordTextMap.get(id))
+          .filter((value): value is string => Boolean(value))
+          .join(' ');
+        setPhraseSelection(null);
+        setInvalidSelection({ wordIds: selectedIds, text });
+        setClickedWords(new Set(selectedIds));
+        setDidDragSelection(true);
+        return;
+      }
+      updatePhraseSelection(anchor, meta.wordIndex);
+    },
+    [isSelectingPhrase, wordMeta, wordIndexMap, wordOrder, wordTextMap, updatePhraseSelection]
+  );
+
+  const handleWordPointerUp = useCallback(() => {
+    setIsSelectingPhrase(false);
+    if (phraseSelection && selectionAnchorRef.current) {
+      const span = phraseSelection.endIdx - phraseSelection.startIdx + 1;
+      const sentenceWords = lesson.sentences[phraseSelection.sentenceIndex].words;
+      const selectedIds = sentenceWords
+        .slice(phraseSelection.startIdx, phraseSelection.endIdx + 1)
+        .map(word => word.id);
+      setLingqWords(prev => {
+        const next = new Set(prev);
+        selectedIds.forEach(id => next.add(id));
+        return next;
+      });
+      if (span > 1) {
+        setSelectedWordId(selectionAnchorRef.current.wordId);
+      }
+    }
+    if (invalidSelection && selectionAnchorRef.current) {
+      setSelectedWordId(selectionAnchorRef.current.wordId);
+    }
+    selectionAnchorRef.current = null;
+  }, [phraseSelection, invalidSelection, lesson.sentences]);
+
+  useEffect(() => {
+    const handleWindowUp = () => {
+      if (isSelectingPhrase) {
+        handleWordPointerUp();
+      }
+    };
+    window.addEventListener('mouseup', handleWindowUp);
+    return () => window.removeEventListener('mouseup', handleWindowUp);
+  }, [isSelectingPhrase, handleWordPointerUp]);
 
   const handleMarkAsKnown = useCallback((wordId: string) => {
     setKnownWords(prev => new Set(prev).add(wordId));
+    setLingqWords(prev => {
+      const next = new Set(prev);
+      next.delete(wordId);
+      return next;
+    });
     setClickedWords(prev => {
       const newSet = new Set(prev);
       newSet.delete(wordId);
@@ -233,6 +398,11 @@ export const Reader: React.FC = () => {
 
   const handleIgnore = useCallback((wordId: string) => {
     setIgnoredWords(prev => new Set(prev).add(wordId));
+    setLingqWords(prev => {
+      const next = new Set(prev);
+      next.delete(wordId);
+      return next;
+    });
     setClickedWords(prev => {
       const newSet = new Set(prev);
       newSet.delete(wordId);
@@ -368,7 +538,11 @@ export const Reader: React.FC = () => {
                   <PageComponent
                     words={page.words}
                     clickedWords={clickedWords}
+                    lingqWords={lingqWords}
                     onWordClick={handleWordClick}
+                    onWordPointerDown={handleWordPointerDown}
+                    onWordPointerEnter={handleWordPointerEnter}
+                    onWordPointerUp={handleWordPointerUp}
                     knownWords={knownWords}
                     ignoredWords={ignoredWords}
                   />
@@ -384,22 +558,66 @@ export const Reader: React.FC = () => {
             />
           </div>
           {selectedWordId && (() => {
-            const word = getWordById(selectedWordId);
-            return word ? (
+            const selectionWords = phraseSelection
+              ? lesson.sentences[phraseSelection.sentenceIndex].words.slice(
+                  phraseSelection.startIdx,
+                  phraseSelection.endIdx + 1
+                )
+              : (() => {
+                  const word = getWordById(selectedWordId);
+                  return word ? [word] : [];
+                })();
+
+            if (selectionWords.length === 0) return null;
+            const anchorId = selectionWords[0]?.id ?? selectedWordId;
+            const anchorRect = (() => {
+              if (selectionWords.length === 1) return undefined;
+              const firstEl = getWordElement(selectionWords[0].id);
+              const lastEl = getWordElement(selectionWords[selectionWords.length - 1].id);
+              if (!firstEl || !lastEl) return undefined;
+              const firstRect = firstEl.getBoundingClientRect();
+              const lastRect = lastEl.getBoundingClientRect();
+              const left = Math.min(firstRect.left, lastRect.left);
+              const right = Math.max(firstRect.right, lastRect.right);
+              const top = Math.min(firstRect.top, lastRect.top);
+              const bottom = Math.max(firstRect.bottom, lastRect.bottom);
+              return new DOMRect(left, top, right - left, bottom - top);
+            })();
+
+            const phraseText = selectionWords.map(word => word.text).join(' ');
+            const phraseTranslation = selectionWords
+              .map(word => word.translation || word.text)
+              .join(' ');
+            const invalidText = invalidSelection?.text
+              ? (() => {
+                  const words = invalidSelection.text.trim().split(/\s+/);
+                  if (words.length <= 9) return invalidSelection.text;
+                  return `${words.slice(0, 9).join(' ')}…`;
+                })()
+              : undefined;
+
+            return (
               <WordToolbar
-                wordId={selectedWordId}
-                wordText={word.text}
-                wordTranslation={word.translation}
-                wordElement={getWordElement(selectedWordId)}
-                wordLevel={getWordLevel(selectedWordId)}
+                wordId={anchorId}
+                wordText={phraseText}
+                wordTranslation={phraseTranslation}
+                wordElement={getWordElement(anchorId)}
+                wordLevel={getWordLevel(anchorId)}
+                anchorRect={anchorRect}
+                invalidSelectionText={invalidText}
                 onSetWordLevel={handleSetWordLevel}
-                onClose={() => setSelectedWordId(null)}
+                onClose={() => {
+                  setSelectedWordId(null);
+                  setPhraseSelection(null);
+                  setInvalidSelection(null);
+                  setClickedWords(new Set());
+                }}
                 onMarkAsKnown={handleMarkAsKnown}
                 onIgnore={handleIgnore}
                 onOpenAIChat={handleOpenAIChat}
                 onInspectSentence={handleInspectSentence}
               />
-            ) : null;
+            );
           })()}
         </>
       )}

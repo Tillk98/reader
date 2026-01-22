@@ -131,7 +131,7 @@
   background: #f8f9fa;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  padding: 11px 13px;
+  padding: 8px 10px;
 }
 
 .word-toolbar-meaning-search.search {
@@ -407,6 +407,38 @@
   min-height: 160px;
   color: #6d7680;
   background: #fff;
+}
+
+.word-toolbar-invalid {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.word-toolbar-invalid-text {
+  background: #f3f4f6;
+  color: #111827;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.word-toolbar-invalid-info {
+  border: none;
+  background: transparent;
+  color: #111827;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.word-toolbar-invalid-translate {
+  border: 1px solid #2e75cd;
+  background: #e9f7fc;
+  color: #2e75cd;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+  cursor: pointer;
 }
 
 .word-toolbar-meaning-dictionary-option {
@@ -852,7 +884,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 13px;
+  padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   background: #f8f9fa;
