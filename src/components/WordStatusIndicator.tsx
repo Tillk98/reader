@@ -5,6 +5,7 @@ import './WordStatusIndicator.css';
 interface WordStatusIndicatorProps {
   level: number;
   onClick: () => void;
+  isOpen?: boolean;
 }
 
 const statusLabels: Record<number, string> = {
@@ -14,7 +15,11 @@ const statusLabels: Record<number, string> = {
   4: 'Learned',
 };
 
-export const WordStatusIndicator: React.FC<WordStatusIndicatorProps> = ({ level, onClick }) => {
+export const WordStatusIndicator: React.FC<WordStatusIndicatorProps> = ({
+  level,
+  onClick,
+  isOpen = false,
+}) => {
   const clampedLevel = Math.max(1, Math.min(4, level));
   const label = statusLabels[clampedLevel];
 
@@ -24,9 +29,12 @@ export const WordStatusIndicator: React.FC<WordStatusIndicatorProps> = ({ level,
       onClick={onClick}
       title={`${label} (${clampedLevel})`}
     >
-      <span className="word-status-number">{clampedLevel}</span>
+      <span className="word-status-number active">{clampedLevel}</span>
       <span className="word-status-label">{label}</span>
-      <ChevronDown size={14} className="word-status-chevron" />
+      <ChevronDown
+        size={14}
+        className={isOpen ? 'word-status-chevron open' : 'word-status-chevron'}
+      />
     </button>
   );
 };

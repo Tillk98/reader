@@ -70,10 +70,10 @@
 
 .word-detail-tag {
   padding: 4px 8px;
-  background: #f3f4f6;
-  border-radius: 6px;
+  background: var(--color-grey-100, #f1f3f4);
+  border-radius: var(--radius-radius-2xs, 4px);
   font-size: 12px;
-  color: #111;
+  color: #2e75cd;
 }
 
 .word-detail-close {

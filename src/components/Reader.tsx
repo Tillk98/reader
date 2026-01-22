@@ -4,7 +4,6 @@ import type { Word } from '../data/lesson';
 import { Page as PageComponent } from './Page';
 import { NavigationChevrons } from './NavigationChevrons';
 import { WordToolbar } from './WordToolbar';
-import { WordDetailPanel } from './WordDetailPanel';
 import './Reader.css';
 
 interface Page {
@@ -19,9 +18,6 @@ export const Reader: React.FC = () => {
   const [ignoredWords, setIgnoredWords] = useState<Set<string>>(new Set());
   const [wordLevels, setWordLevels] = useState<Map<string, number>>(new Map());
   const [selectedWordId, setSelectedWordId] = useState<string | null>(null);
-  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
-  const [detailPanelView, setDetailPanelView] = useState('meanings');
-  const [detailWordId, setDetailWordId] = useState<string | null>(null);
   const [chevronVisible, setChevronVisible] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const mouseActivityTimeoutRef = useRef<number | null>(null);
@@ -283,16 +279,6 @@ export const Reader: React.FC = () => {
     return undefined;
   }, []);
 
-  const handleOpenDetailPanel = useCallback((view: string, wordId: string) => {
-    setDetailPanelView(view);
-    setDetailWordId(wordId);
-    setDetailPanelOpen(true);
-  }, []);
-
-  const handleCloseDetailPanel = useCallback(() => {
-    setDetailPanelOpen(false);
-  }, []);
-
   // Get word element from DOM
   const getWordElement = useCallback((wordId: string): HTMLElement | null => {
     return document.getElementById(wordId);
@@ -339,7 +325,7 @@ export const Reader: React.FC = () => {
   const thumbProgress = fillProgress;
 
   return (
-    <div className={`reader ${detailPanelOpen ? 'panel-open' : ''}`} ref={containerRef}>
+    <div className="reader" ref={containerRef}>
       {pages.length === 0 ? (
         <div className="reader-loading">Loading...</div>
       ) : (
@@ -369,7 +355,7 @@ export const Reader: React.FC = () => {
               )}
             </div>
           </div>
-          <div className={`reader-content ${detailPanelOpen ? 'panel-open' : ''}`}>
+          <div className="reader-content">
             <div 
               className="pages-container"
               style={{
@@ -397,13 +383,6 @@ export const Reader: React.FC = () => {
               visible={chevronVisible}
             />
           </div>
-          <WordDetailPanel
-            isOpen={detailPanelOpen}
-            view={detailPanelView}
-            word={detailWordId ? getWordById(detailWordId) : undefined}
-            wordLevel={detailWordId ? getWordLevel(detailWordId) : 1}
-            onClose={handleCloseDetailPanel}
-          />
           {selectedWordId && (() => {
             const word = getWordById(selectedWordId);
             return word ? (
@@ -414,7 +393,6 @@ export const Reader: React.FC = () => {
                 wordElement={getWordElement(selectedWordId)}
                 wordLevel={getWordLevel(selectedWordId)}
                 onSetWordLevel={handleSetWordLevel}
-                onOpenDetailPanel={handleOpenDetailPanel}
                 onClose={() => setSelectedWordId(null)}
                 onMarkAsKnown={handleMarkAsKnown}
                 onIgnore={handleIgnore}
