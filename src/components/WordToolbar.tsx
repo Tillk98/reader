@@ -680,7 +680,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
                 )}
                 <input
                   className="word-toolbar-meaning-input"
-                  placeholder="Add a new note (or type '/' to search) ..."
+                  placeholder="Add a new meaning (or type '/' to search) ..."
                   value={meaningQuery}
                   onChange={event => setMeaningQuery(event.target.value)}
                 />
