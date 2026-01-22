@@ -495,7 +495,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
 
   const bindViewportClamp = (
     isOpen: boolean,
-    ref: React.RefObject<HTMLDivElement>,
+    ref: React.RefObject<HTMLDivElement | null>,
     setOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>,
     listSelector?: string
   ) => {
