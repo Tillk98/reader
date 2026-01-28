@@ -42,6 +42,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
   onClose,
 }) => {
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{
     top?: number;
     bottom?: number;
@@ -51,6 +52,13 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
     top: 0,
     left: 0,
   });
+  const [panelPosition, setPanelPosition] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    maxHeight?: number;
+  } | null>(null);
+  const [panelWidth, setPanelWidth] = useState<number | null>(null);
   const [placement, setPlacement] = useState<'above' | 'below'>('above');
   const [isHovered, setIsHovered] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -71,6 +79,10 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
   const explainTimeoutRef = useRef<number | null>(null);
   const explainIntervalRef = useRef<number | null>(null);
   const selectedMeaningRef = useRef<HTMLSpanElement>(null);
+  const headerMeaningRef = useRef<HTMLSpanElement>(null);
+  const [isHeaderMeaningTruncated, setIsHeaderMeaningTruncated] = useState(false);
+  const [canShowMeaningTooltip, setCanShowMeaningTooltip] = useState(false);
+  const [isMeaningHovered, setIsMeaningHovered] = useState(false);
   const [isSelectedMeaningWrapped, setIsSelectedMeaningWrapped] = useState(false);
   const showActions = isExpanded || isHovered;
   const [meaningOptions, setMeaningOptions] = useState([
@@ -204,6 +216,27 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
     };
   }, [activeTab, isExpanded, selectedMeaning, sortedMeanings.length]);
 
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (!headerMeaningRef.current) return;
+      const { scrollWidth, clientWidth } = headerMeaningRef.current;
+      setIsHeaderMeaningTruncated(scrollWidth > clientWidth + 1);
+    };
+
+    const frame = window.requestAnimationFrame(measure);
+    window.addEventListener('resize', measure);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', measure);
+    };
+  }, [selectedMeaning, isExpanded, isHovered]);
+
+  useEffect(() => {
+    if (isExpanded) {
+      setCanShowMeaningTooltip(false);
+    }
+  }, [isExpanded, selectedMeaning]);
+
   const handleExpand = (
     tab: 'meaning' | 'status' | 'sentence' | 'notes' | 'explain'
   ) => {
@@ -218,14 +251,21 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
 
       const rect = anchorRect ?? element.getBoundingClientRect();
       const toolbarHeight = toolbarRef.current.offsetHeight || 0;
-      const toolbarWidth = toolbarRef.current.offsetWidth || 0;
-      const gap = 8;
+      const maxToolbarWidth = 340;
+      const toolbarWidth = Math.min(toolbarRef.current.offsetWidth || 0, maxToolbarWidth);
+      const panelHeight = panelRef.current?.offsetHeight || toolbarHeight;
+      const measuredPanelWidth = Math.min(
+        panelRef.current?.offsetWidth || toolbarWidth,
+        toolbarWidth
+      );
+      const gap = 6;
       const edge = 8;
 
       const spaceAbove = rect.top - gap - edge;
       const spaceBelow = window.innerHeight - rect.bottom - gap - edge;
-      const fitsAbove = spaceAbove >= toolbarHeight;
-      const fitsBelow = spaceBelow >= toolbarHeight;
+      const contentHeight = isExpanded ? panelHeight : toolbarHeight;
+      const fitsAbove = spaceAbove >= contentHeight;
+      const fitsBelow = spaceBelow >= contentHeight;
       let nextPlacement: 'above' | 'below';
 
       if (fitsAbove && fitsBelow) {
@@ -251,6 +291,39 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
         setPosition({ top: undefined, bottom, left, maxHeight });
       }
       setPlacement(nextPlacement);
+
+      if (isExpanded) {
+        const panelMaxLeft = Math.max(edge, window.innerWidth - measuredPanelWidth - edge);
+        const panelLeft = Math.min(Math.max(left, edge), panelMaxLeft);
+        const toolbarTop =
+          nextPlacement === 'below'
+            ? rect.bottom + gap
+            : rect.top - gap - toolbarHeight;
+
+        if (nextPlacement === 'below') {
+          const panelTop = toolbarTop + toolbarHeight + gap;
+          const panelSpaceBelow = window.innerHeight - panelTop - edge;
+          setPanelPosition({
+            top: panelTop,
+            bottom: undefined,
+            left: panelLeft,
+            maxHeight: Math.max(0, panelSpaceBelow),
+          });
+        } else {
+          const panelBottom = window.innerHeight - (toolbarTop - gap);
+          const panelSpaceAbove = toolbarTop - gap - edge;
+          setPanelPosition({
+            top: undefined,
+            bottom: panelBottom,
+            left: panelLeft,
+            maxHeight: Math.max(0, panelSpaceAbove),
+          });
+        }
+        setPanelWidth(measuredPanelWidth);
+      } else {
+        setPanelPosition(null);
+        setPanelWidth(null);
+      }
     };
 
     const raf = requestAnimationFrame(updatePosition);
@@ -262,13 +335,24 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
       window.removeEventListener('scroll', updatePosition, true);
       window.removeEventListener('resize', updatePosition);
     };
-  }, [wordElement, wordId, anchorRect, translation, invalidSelectionText]);
+  }, [
+    wordElement,
+    wordId,
+    anchorRect,
+    translation,
+    invalidSelectionText,
+    isExpanded,
+    activeTab,
+    selectedMeaning,
+    sortedMeanings.length,
+  ]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
         toolbarRef.current &&
         !toolbarRef.current.contains(event.target as Node) &&
+        !(panelRef.current && panelRef.current.contains(event.target as Node)) &&
         wordElement &&
         !wordElement.contains(event.target as Node)
       ) {
@@ -284,7 +368,6 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
 
   const actionsInner = (
     <div className="meaning-popup-actions-inner">
-      <div className="meaning-popup-divider" aria-hidden="true" />
       <button
         className={`meaning-popup-action meaning-popup-status meaning-popup-tooltip${
           isExpanded && activeTab === 'status' ? ' active' : ''
@@ -345,251 +428,283 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
       }`}
       type="button"
       onClick={() => handleExpand('meaning')}
+      onMouseEnter={() => {
+        setIsMeaningHovered(true);
+      }}
+      onMouseLeave={() => {
+        setIsMeaningHovered(false);
+        setCanShowMeaningTooltip(true);
+      }}
     >
-      <span className="meaning-popup-header-meaning-text">{selectedMeaning}</span>
+      <span ref={headerMeaningRef} className="meaning-popup-header-meaning-text">
+        {selectedMeaning}
+      </span>
     </button>
   );
 
-  return (
+  const panelContent = (
+    <div className="meaning-popup-panel">
+      {activeTab === 'meaning' ? (
+        <>
+          <div className="meaning-popup-search">
+            <input
+              className="meaning-popup-search-input"
+              placeholder="Search or add a new meaning ..."
+              value={meaningQuery}
+              onChange={event => {
+                const nextValue = event.target.value;
+                setMeaningQuery(nextValue);
+                if (addedMeaning && nextValue.trim() !== addedMeaning) {
+                  setAddedMeaning(null);
+                }
+              }}
+            />
+            {meaningQuery.trim().length > 0 && (
+              <button
+                className="meaning-popup-search-clear"
+                type="button"
+                aria-label="Clear search"
+                onClick={() => setMeaningQuery('')}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <div className="meaning-popup-meaning-row">
+            <div
+              className={`meaning-popup-meaning-list-wrap${showMeaningFade ? ' show-fade' : ''}`}
+            >
+              <div
+                className={`meaning-popup-meaning-list${isSelectedMeaningWrapped ? ' is-expanded' : ''}`}
+              >
+                {sortedMeanings
+                  .filter(option => option.text !== selectedMeaning)
+                  .map(option => {
+                    const metaLabel = option.count;
+                  return (
+                    <button
+                      key={option.text}
+                      className="meaning-popup-meaning-option"
+                      type="button"
+                      onClick={() => setSelectedMeaning(option.text)}
+                    >
+                      <span className="meaning-popup-meaning-option-text">
+                        <span>{option.text}</span>
+                      </span>
+                      {metaLabel ? (
+                        <span className="meaning-popup-meaning-meta">
+                          <span className="meaning-popup-meaning-count">{metaLabel}</span>
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+                {canAddMeaning && (
+                  <button
+                    className={`meaning-popup-meaning-add${
+                      addedMeaning && addedMeaning === meaningQuery.trim() ? ' success' : ''
+                    }`}
+                    type="button"
+                    onClick={() => {
+                      const nextValue = meaningQuery.trim();
+                      if (!nextValue) return;
+                      setSelectedMeaning(nextValue);
+                      setAddedMeaning(nextValue);
+                      if (addMeaningTimeoutRef.current !== null) {
+                        window.clearTimeout(addMeaningTimeoutRef.current);
+                      }
+                      addMeaningTimeoutRef.current = window.setTimeout(() => {
+                        setMeaningOptions(prevOptions => {
+                          if (prevOptions.some(option => option.text === nextValue)) {
+                            return prevOptions;
+                          }
+                          return [...prevOptions, { text: nextValue, count: '' }];
+                        });
+                        setAddedMeaning(null);
+                      }, 3000);
+                    }}
+                  >
+                    <span className="meaning-popup-meaning-add-label">{meaningQuery.trim()}</span>
+                    <span className="meaning-popup-meaning-add-action">
+                      {addedMeaning && addedMeaning === meaningQuery.trim() ? (
+                        <Check size={18} />
+                      ) : (
+                        <Plus size={18} />
+                      )}
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="meaning-popup-panel-divider" />
+          <div className="meaning-popup-dictionaries">
+            <button
+              className="meaning-popup-dictionary-action"
+              type="button"
+              aria-label="Open dictionary"
+            >
+              <BookA size={18} />
+            </button>
+            {dictionaries.map(dictionary => (
+              <div key={dictionary.id} className="meaning-popup-dictionary">
+                <img
+                  src={new URL(`../assets/${dictionary.icon}`, import.meta.url).toString()}
+                  alt=""
+                  className="meaning-popup-dictionary-icon"
+                />
+                <span>{dictionary.name}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : activeTab === 'sentence' ? (
+        <div className="meaning-popup-sentence">
+          <div className="meaning-popup-sentence-source">We do not monetize all of our videos.</div>
+          <div className="meaning-popup-sentence-translation">
+            Nous ne monétisons pas toutes nos vidéos.
+          </div>
+        </div>
+      ) : activeTab === 'explain' ? (
+        <div className="meaning-popup-explain">
+          {explainStatus === 'loading' ? (
+            <div className="meaning-popup-explain-loading">
+              <span>Lynx is thinking</span>
+              <span className="meaning-popup-explain-ellipsis" aria-hidden="true">
+                <span>.</span>
+                <span>.</span>
+                <span>.</span>
+              </span>
+            </div>
+          ) : (
+            <>
+              <p className="meaning-popup-explain-text">{explainText}</p>
+              <div className="meaning-popup-explain-actions">
+                <button type="button" aria-label="Regenerate explanation">
+                  <RefreshCw size={18} />
+                </button>
+                <button type="button" aria-label="Add as note">
+                  <NotebookPen size={18} />
+                </button>
+                <button type="button" aria-label="Copy explanation" className="copy">
+                  <Copy size={18} />
+                </button>
+                <button type="button" aria-label="Ask Lynx" className="chat">
+                  <MessageSquare size={18} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : activeTab === 'status' ? (
+        <div className="meaning-popup-status-panel">
+          <div className="meaning-popup-status-list">
+            {[
+              { level: 1, label: 'New' },
+              { level: 2, label: 'Recognized' },
+              { level: 3, label: 'Familiar' },
+              { level: 4, label: 'Learned' },
+            ].map(item => (
+              <button
+                key={item.level}
+                className={`meaning-popup-status-row${item.level === wordLevel ? ' active' : ''}`}
+                type="button"
+              >
+                <span className="meaning-popup-status-left">
+                  <span
+                    className={`meaning-popup-status-icon${
+                      item.level === wordLevel ? ' active' : ''
+                    }`}
+                  >
+                    {item.level}
+                  </span>
+                  <span className="meaning-popup-status-label">{item.label}</span>
+                </span>
+                <span className="meaning-popup-status-shortcut">{item.level}</span>
+              </button>
+            ))}
+          </div>
+          <div className="meaning-popup-status-divider" />
+          <div className="meaning-popup-status-actions">
+            <button className="meaning-popup-status-action known" type="button">
+              <span className="meaning-popup-status-left">
+                <CircleCheck size={18} />
+                <span>Known</span>
+              </span>
+              <span className="meaning-popup-status-shortcut">k</span>
+            </button>
+            <button className="meaning-popup-status-action ignore" type="button">
+              <span className="meaning-popup-status-left">
+                <EyeOff size={18} />
+                <span>Ignore</span>
+              </span>
+              <span className="meaning-popup-status-shortcut">x</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="meaning-popup-panel-empty" />
+      )}
+    </div>
+  );
+
+  const expandedPanel = isExpanded && panelPosition ? (
     <div
-      ref={toolbarRef}
-      className={`meaning-popup placement-${placement}${isHovered ? ' is-hovered' : ''}${
-        isExpanded ? ' is-expanded' : ''
-      }`}
+      ref={panelRef}
+      className={`meaning-popup-panel-detached placement-${placement}`}
       style={{
         position: 'fixed',
-        left: `${position.left}px`,
-        top: position.top !== undefined ? `${position.top}px` : undefined,
-        bottom: position.bottom !== undefined ? `${position.bottom}px` : undefined,
-        maxHeight: position.maxHeight !== undefined ? `${position.maxHeight}px` : undefined,
+        left: `${panelPosition.left}px`,
+        top: panelPosition.top !== undefined ? `${panelPosition.top}px` : undefined,
+        bottom: panelPosition.bottom !== undefined ? `${panelPosition.bottom}px` : undefined,
+        maxHeight:
+          panelPosition.maxHeight !== undefined ? `${panelPosition.maxHeight}px` : undefined,
+        width: panelWidth ? `${panelWidth}px` : undefined,
       }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
-      {invalidSelectionText ? (
-        <div className="meaning-popup-invalid">{invalidSelectionText}</div>
-      ) : (
-        <>
+      {panelContent}
+    </div>
+  ) : null;
+
+  return (
+    <>
+      <div
+        ref={toolbarRef}
+        className={`meaning-popup placement-${placement}${isHovered ? ' is-hovered' : ''}${
+          isExpanded ? ' is-expanded' : ''
+        }`}
+        style={{
+          position: 'fixed',
+          left: `${position.left}px`,
+          top: position.top !== undefined ? `${position.top}px` : undefined,
+          bottom: position.bottom !== undefined ? `${position.bottom}px` : undefined,
+          maxHeight: position.maxHeight !== undefined ? `${position.maxHeight}px` : undefined,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {invalidSelectionText ? (
+          <div className="meaning-popup-invalid">{invalidSelectionText}</div>
+        ) : (
           <div className={`meaning-popup-header${isExpanded ? ' is-expanded' : ''}`}>
             <div className="meaning-popup-header-row">
               {headerMeaning}
               {actions}
-            </div>
-          </div>
-          {isExpanded && (
-            <div className="meaning-popup-panel">
-              {activeTab === 'meaning' ? (
-                <>
-                  <div className="meaning-popup-search">
-                    <input
-                      className="meaning-popup-search-input"
-                      placeholder="Search or add a new meaning ..."
-                      value={meaningQuery}
-                      onChange={event => {
-                        const nextValue = event.target.value;
-                        setMeaningQuery(nextValue);
-                        if (addedMeaning && nextValue.trim() !== addedMeaning) {
-                          setAddedMeaning(null);
-                        }
-                      }}
-                    />
-                    {meaningQuery.trim().length > 0 && (
-                      <button
-                        className="meaning-popup-search-clear"
-                        type="button"
-                        aria-label="Clear search"
-                        onClick={() => setMeaningQuery('')}
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                  <div className="meaning-popup-meaning-row">
-                    <div
-                      className={`meaning-popup-meaning-list-wrap${
-                        showMeaningFade ? ' show-fade' : ''
-                      }`}
-                    >
-                      <div
-                        className={`meaning-popup-meaning-list${
-                          isSelectedMeaningWrapped ? ' is-expanded' : ''
-                        }`}
-                      >
-                        {sortedMeanings.map(option => {
-                          const isSaved = option.text === selectedMeaning;
-                          const metaLabel = isSaved ? 'Saved' : option.count;
-                          return (
-                            <button
-                              key={option.text}
-                              className={`meaning-popup-meaning-option${isSaved ? ' saved' : ''}`}
-                              type="button"
-                              onClick={() => setSelectedMeaning(option.text)}
-                            >
-                              <span className="meaning-popup-meaning-option-text">
-                                <span ref={isSaved ? selectedMeaningRef : undefined}>
-                                  {option.text}
-                                </span>
-                              </span>
-                              {metaLabel ? (
-                                <span className="meaning-popup-meaning-meta">
-                                  <span className="meaning-popup-meaning-count">{metaLabel}</span>
-                                </span>
-                              ) : null}
-                            </button>
-                          );
-                        })}
-                        {canAddMeaning && (
-                          <button
-                            className={`meaning-popup-meaning-add${
-                              addedMeaning && addedMeaning === meaningQuery.trim() ? ' success' : ''
-                            }`}
-                            type="button"
-                            onClick={() => {
-                              const nextValue = meaningQuery.trim();
-                              if (!nextValue) return;
-                              setSelectedMeaning(nextValue);
-                              setAddedMeaning(nextValue);
-                              if (addMeaningTimeoutRef.current !== null) {
-                                window.clearTimeout(addMeaningTimeoutRef.current);
-                              }
-                              addMeaningTimeoutRef.current = window.setTimeout(() => {
-                                setMeaningOptions(prevOptions => {
-                                  if (prevOptions.some(option => option.text === nextValue)) {
-                                    return prevOptions;
-                                  }
-                                  return [...prevOptions, { text: nextValue, count: '' }];
-                                });
-                                setAddedMeaning(null);
-                              }, 3000);
-                            }}
-                          >
-                            <span className="meaning-popup-meaning-add-label">{meaningQuery.trim()}</span>
-                            <span className="meaning-popup-meaning-add-action">
-                              {addedMeaning && addedMeaning === meaningQuery.trim() ? (
-                                <Check size={18} />
-                              ) : (
-                                <Plus size={18} />
-                              )}
-                            </span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="meaning-popup-panel-divider" />
-                  <div className="meaning-popup-dictionaries">
-                    <button
-                      className="meaning-popup-dictionary-action"
-                      type="button"
-                      aria-label="Open dictionary"
-                    >
-                      <BookA size={18} />
-                    </button>
-                    {dictionaries.map(dictionary => (
-                      <div key={dictionary.id} className="meaning-popup-dictionary">
-                        <img
-                          src={new URL(`../assets/${dictionary.icon}`, import.meta.url).toString()}
-                          alt=""
-                          className="meaning-popup-dictionary-icon"
-                        />
-                        <span>{dictionary.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : activeTab === 'sentence' ? (
-                <div className="meaning-popup-sentence">
-                  <div className="meaning-popup-sentence-source">We do not monetize all of our videos.</div>
-                  <div className="meaning-popup-sentence-translation">
-                    Nous ne monétisons pas toutes nos vidéos.
-                  </div>
+              {isExpanded && isHeaderMeaningTruncated && (
+                <div
+                  className={`meaning-popup-header-meaning-tooltip${
+                    isMeaningHovered && canShowMeaningTooltip ? ' is-visible' : ''
+                  }`}
+                  role="tooltip"
+                >
+                  {selectedMeaning}
                 </div>
-              ) : activeTab === 'explain' ? (
-                <div className="meaning-popup-explain">
-                  {explainStatus === 'loading' ? (
-                    <div className="meaning-popup-explain-loading">
-                      <span>Lynx is thinking</span>
-                      <span className="meaning-popup-explain-ellipsis" aria-hidden="true">
-                        <span>.</span>
-                        <span>.</span>
-                        <span>.</span>
-                      </span>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="meaning-popup-explain-text">{explainText}</p>
-                      <div className="meaning-popup-explain-actions">
-                        <button type="button" aria-label="Regenerate explanation">
-                          <RefreshCw size={18} />
-                        </button>
-                        <button type="button" aria-label="Add as note">
-                          <NotebookPen size={18} />
-                        </button>
-                        <button type="button" aria-label="Copy explanation" className="copy">
-                          <Copy size={18} />
-                        </button>
-                        <button type="button" aria-label="Ask Lynx" className="chat">
-                          <MessageSquare size={18} />
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ) : activeTab === 'status' ? (
-                <div className="meaning-popup-status-panel">
-                  <div className="meaning-popup-status-list">
-                    {[
-                      { level: 1, label: 'New' },
-                      { level: 2, label: 'Recognized' },
-                      { level: 3, label: 'Familiar' },
-                      { level: 4, label: 'Learned' },
-                    ].map(item => (
-                      <button
-                        key={item.level}
-                        className={`meaning-popup-status-row${
-                          item.level === wordLevel ? ' active' : ''
-                        }`}
-                        type="button"
-                      >
-                        <span className="meaning-popup-status-left">
-                          <span
-                            className={`meaning-popup-status-icon${
-                              item.level === wordLevel ? ' active' : ''
-                            }`}
-                          >
-                            {item.level}
-                          </span>
-                          <span className="meaning-popup-status-label">{item.label}</span>
-                        </span>
-                        <span className="meaning-popup-status-shortcut">{item.level}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="meaning-popup-status-divider" />
-                  <div className="meaning-popup-status-actions">
-                    <button className="meaning-popup-status-action known" type="button">
-                      <span className="meaning-popup-status-left">
-                        <CircleCheck size={18} />
-                        <span>Known</span>
-                      </span>
-                      <span className="meaning-popup-status-shortcut">k</span>
-                    </button>
-                    <button className="meaning-popup-status-action ignore" type="button">
-                      <span className="meaning-popup-status-left">
-                        <EyeOff size={18} />
-                        <span>Ignore</span>
-                      </span>
-                      <span className="meaning-popup-status-shortcut">x</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="meaning-popup-panel-empty" />
               )}
             </div>
-          )}
-        </>
-      )}
-    </div>
+          </div>
+        )}
+      </div>
+      {expandedPanel}
+    </>
   );
 };
