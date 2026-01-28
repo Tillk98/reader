@@ -1,5 +1,5 @@
 .meaning-popup {
-  z-index: 1000;
+  z-index: 1003;
   pointer-events: auto;
   display: inline-flex;
   flex-direction: row;
@@ -11,18 +11,27 @@
   border-radius: 6px;
   max-width: none;
   box-sizing: border-box;
-  transition: width 0.2s ease, padding 0.2s ease, box-shadow 0.2s ease;
+  transition: max-width 0.45s cubic-bezier(0.22, 0.61, 0.36, 1),
+    width 0.45s cubic-bezier(0.22, 0.61, 0.36, 1),
+    padding 0.35s ease-out,
+    box-shadow 0.35s ease-out;
+  will-change: max-width, width;
   overflow: visible;
 }
 
+.meaning-popup.is-hovered,
 .meaning-popup.is-expanded {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  width: 320px;
-  padding: 0 0 16px;
-  border-color: #f1f3f4;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+  max-width: 340px;
+}
+
+.meaning-popup.is-expanded {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  width: 340px;
+  padding: 4px 8px;
+  border-color: #d1d6d9;
+  box-shadow: none;
 }
 
 .meaning-popup-header {
@@ -36,8 +45,8 @@
   align-items: center;
   gap: 16px;
   width: 100%;
-  padding: 8px 12px;
-  border-bottom: 1px solid #f1f3f4;
+  padding: 0;
+  border-bottom: none;
 }
 
 .meaning-popup-header-row {
@@ -47,6 +56,7 @@
   width: 100%;
   min-width: 0;
   justify-content: flex-start;
+  position: relative;
 }
 
 .meaning-popup.is-hovered .meaning-popup-header-row,
@@ -111,15 +121,7 @@
   padding-left: 0;
 }
 
-.meaning-popup-divider {
-  width: 1px;
-  height: 19px;
-  background: #d1d6d9;
-}
 
-.meaning-popup.is-expanded .meaning-popup-divider {
-  display: none;
-}
 
 .meaning-popup-action {
   border: none;
@@ -131,6 +133,10 @@
   justify-content: center;
   color: #6d7680;
   cursor: pointer;
+}
+
+.meaning-popup-action:hover {
+  background: #f4f7fb;
 }
 
 .meaning-popup-status {
@@ -198,7 +204,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.1s ease;
-  z-index: 1002;
+  z-index: 1003;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
@@ -213,7 +219,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.1s ease;
-  z-index: 1002;
+  z-index: 1003;
 }
 
 .meaning-popup-tooltip:hover::after,
@@ -227,8 +233,21 @@
   background: #f1f3f4;
 }
 
+.meaning-popup-panel-detached {
+  width: 100%;
+  max-width: 340px;
+  min-width: 340px;
+  background: #fff;
+  border: 1px solid #d1d6d9;
+  border-radius: 6px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+  padding: 12px 16px;
+  z-index: 1001;
+  overflow: auto;
+}
+
 .meaning-popup-panel {
-  padding: 8px 16px 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -308,7 +327,7 @@
 .meaning-popup-status-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   padding: 0;
 }
 
@@ -316,7 +335,7 @@
 .meaning-popup-status-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .meaning-popup-status-row,
@@ -348,8 +367,8 @@
 }
 
 .meaning-popup-status-icon {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
   background: #f8f9fa;
   border: 0.5px solid #d1d6d9;
@@ -369,8 +388,8 @@
 
 .meaning-popup-status-label {
   font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 18px;
+  font-size: 12px;
+  line-height: 16px;
   color: #1a1a1a;
 }
 
@@ -401,6 +420,16 @@
 
 .meaning-popup-status-action.ignore {
   color: #dd2525;
+}
+
+.meaning-popup-status-action .meaning-popup-status-left span {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.meaning-popup-status-action svg {
+  width: 18px;
+  height: 18px;
 }
 
 .meaning-popup-explain-actions {
@@ -574,10 +603,19 @@
   width: fit-content;
   max-width: 100%;
   justify-content: flex-start;
+  background: transparent;
+  border-color: transparent;
+  border: 0.5px solid transparent;
+}
+
+.meaning-popup-header-meaning:hover {
+  background: #f4f7fb;
 }
 
 .meaning-popup-header-meaning-text {
-  font-size: 16px;
+  display: block;
+  font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
   font-weight: 600;
   color: #1a1a1a;
   overflow: hidden;
@@ -585,12 +623,37 @@
   white-space: nowrap;
 }
 
-.meaning-popup.is-expanded .meaning-popup-header-meaning-text {
-  font-size: 14px;
-}
-
 .meaning-popup-header-meaning.flash {
   animation: meaning-header-flash 0.9s ease;
+}
+
+.meaning-popup-header-meaning-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: -8px;
+  width: calc(100% + 16px);
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #d1d6d9;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  color: #1a1a1a;
+  text-align: left;
+  white-space: normal;
+  z-index: 1003;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.meaning-popup-header-meaning-tooltip.is-visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 @keyframes meaning-header-flash {
@@ -610,6 +673,10 @@
 
 .meaning-popup-meaning-option:hover {
   background: #e3e5e7;
+}
+
+.meaning-popup-header-meaning.meaning-popup-meaning-option:hover {
+  background: #f4f7fb;
 }
 
 .meaning-popup-meaning-option.saved {
@@ -1246,7 +1313,7 @@
 .word-toolbar-status-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .word-toolbar-status-row {
@@ -1270,6 +1337,8 @@
 
 .word-toolbar-status-row.action {
   color: #1a1a1a;
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .word-toolbar-status-row.action.known {
@@ -1282,6 +1351,8 @@
 
 .word-toolbar-status-row.action svg {
   flex-shrink: 0;
+  width: 18px;
+  height: 18px;
 }
 
 .word-toolbar-status-level {
@@ -1294,8 +1365,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   border-radius: 999px;
   background: #f8f9fa;
@@ -1313,9 +1384,9 @@
 }
 
 .word-toolbar-level-label {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 400;
-  line-height: 18px;
+  line-height: 16px;
   color: #1a1a1a;
 }
 
@@ -1862,7 +1933,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.1s ease;
-  z-index: 1002;
+  z-index: 1003;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
@@ -1877,7 +1948,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.1s ease;
-  z-index: 1002;
+  z-index: 1003;
 }
 
 .word-toolbar-tooltip:hover::after,
